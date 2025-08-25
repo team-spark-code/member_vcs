@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Signup</title>
+</head>
+<body>
+<div style="max-width:400px;margin:40px auto;padding:24px;border:1px solid #eee;border-radius:8px;box-shadow:0 2px 8px #eee;">
+<h2 style="text-align:center;">회원가입</h2>
+<form th:action="@{/signup}" th:object="${memberForm}" method="post" style="display:flex;flex-direction:column;gap:12px;">
+    <button type="button" onclick="location.href='/'" style="align-self:flex-end;">메인으로</button>
+    <label>아이디 <input type="text" th:field="*{username}" placeholder="아이디" oninput="checkUsernameDuplicate()" style="width:100%;padding:6px;"></label>
+    <span id="username-message" style="color:red;font-size:12px;"></span>
+    <label>이름 <input type="text" th:field="*{name}" placeholder="이름" style="width:100%;padding:6px;"></label>
+    <label>이메일 <input type="email" th:field="*{email}" placeholder="이메일" oninput="checkEmailDuplicate()" style="width:100%;padding:6px;"></label>
+    <span id="email-message" style="color:red;font-size:12px;"></span>
+
+    <!-- 전화번호 입력란 추가 -->
+    <label>전화번호</label>
+    <div style="display: flex; align-items: center; gap: 8px;">
+        <input type="text" id="phone1" th:field="*{phone1}" maxlength="3" style="width: 30%; padding: 6px; text-align: center;" oninput="this.value = this.value.replace(/[^0-9]/g, '');" onkeyup="moveToNext(this, 'phone2', 3)">
+        <span>-</span>
+        <input type="text" id="phone2" th:field="*{phone2}" maxlength="4" style="width: 35%; padding: 6px; text-align: center;" oninput="this.value = this.value.replace(/[^0-9]/g, '');" onkeyup="moveToNext(this, 'phone3', 4)">
+        <span>-</span>
+        <input type="text" id="phone3" th:field="*{phone3}" maxlength="4" style="width: 35%; padding: 6px; text-align: center;" oninput="this.value = this.value.replace(/[^0-9]/g, '');">
+    </div>
+
+    <label>비밀번호 <input type="password" th:field="*{password}" placeholder="비밀번호" style="width:100%;padding:6px;"></label>
+    <label>비밀번호 재입력 <input type="password" th:field="*{passwordConfirm}" placeholder="비밀번호 재입력" style="width:100%;padding:6px;"></label>
+    <label>우편번호 <input type="text" th:field="*{zipcode}" placeholder="우편번호" readonly style="width:70%;padding:6px;"> <button type="button" onclick="execDaumPostcode()">우편번호 찾기</button></label>
+    <label>주소 <input type="text" th:field="*{address}" placeholder="주소" readonly style="width:100%;padding:6px;"></label>
+    <label>상세주소 <input type="text" th:field="*{detailAddress}" placeholder="상세주소" style="width:100%;padding:6px;"></label>
+    <button type="submit" id="submitBtn" style="margin-top:12px;">등록</button>
+</form>
+</div>
+<script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+<script>
+    var usernameValid = false;
+    var emailValid = false;
+    var lastUsernameChecked = '';
+    var lastEmailChecked = '';
+
+    function moveToNext(current, nextFieldId, maxLength) {
+        if (current.value.length >= maxLength) {
+            document.getElementById(nextFieldId).focus();
+        }
+    }
+
+    function updateSubmitButton() {
+        var submitBtn = document.getElementById('submitBtn');
+        var username = document.getElementById('username').value;
+        var email = document.getElementById('email').value;
+        // 입력값이 비어있거나 중복이면 비활성화
+        submitBtn.disabled = !usernameValid || !emailValid || !username || !email;
+    }
+
+    function execDaumPostcode() {
+        new daum.Postcode({
+            oncomplete: function(data) {
+                document.getElementById('zipcode').value = data.zonecode;
+                document.getElementById('address').value = data.roadAddress;
+                document.getElementById('detailAddress').focus();
+            }
+        }).open();
+    }
+
+    function checkUsernameDuplicate() {
+        var username = document.getElementById('username').value;
+        var message = document.getElementById('username-message');
+        lastUsernameChecked = username;
+        if (!username) {
+            message.textContent = '';
+            usernameValid = false;
+            updateSubmitButton();
+            return;
+        }
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/check-username?username=' + encodeURIComponent(username), true);
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4 && xhr.status === 200 && lastUsernameChecked === username) {
+                if (xhr.responseText === 'duplicate') {
+                    message.textContent = '이미 존재하는 이름입니다.';
+                    usernameValid = false;
+                } else {
+                    message.textContent = '';
+                    usernameValid = true;
+                }
+                updateSubmitButton();
+            }
+        };
+        xhr.send();
+    }
+
+    function checkEmailDuplicate() {
+        var email = document.getElementById('email').value;
+        var message = document.getElementById('email-message');
+        lastEmailChecked = email;
+        if (!email) {
+            message.textContent = '';
+            emailValid = false;
+            updateSubmitButton();
+            return;
+        }
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/check-email?email=' + encodeURIComponent(email), true);
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4 && xhr.status === 200 && lastEmailChecked === email) {
+                if (xhr.responseText === 'duplicate') {
+                    message.textContent = '이미 존재하는 이메일입니다.';
+                    emailValid = false;
+                } else {
+                    message.textContent = '';
+                    emailValid = true;
+                }
+                updateSubmitButton();
+            }
+        };
+        xhr.send();
+    }
+</script>
+</body>
+</html>

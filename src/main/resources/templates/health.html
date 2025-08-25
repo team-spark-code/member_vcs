@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>애플리케이션 상태</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+    <div class="container">
+        <h1>애플리케이션 상태</h1>
+        <div class="section">
+            <div class="success">
+                <h3>✓ 애플리케이션이 정상적으로 실행되고 있습니다!</h3>
+                <p>모든 서비스가 정상 작동 중입니다.</p>
+                <a th:href="@{/springboot-rss/src/main/resources/static}" class="btn">메인 페이지로 돌아가기</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+

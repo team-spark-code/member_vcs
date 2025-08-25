@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>회원정보 수정</title>
+</head>
+<body>
+<div style="max-width:400px;margin:40px auto;padding:24px;border:1px solid #eee;border-radius:8px;box-shadow:0 2px 8px #eee;">
+<h2 style="text-align:center;">회원정보 수정</h2>
+<form th:action="@{/profile}" th:object="${memberForm}" method="post" style="display:flex;flex-direction:column;gap:12px;">
+    <button type="button" onclick="location.href='/'" style="align-self:flex-end;">메인으로</button>
+    <label>아이디 <input type="text" th:field="*{username}" readonly style="width:100%;padding:6px;"></label>
+    <label>이름 <input type="text" th:field="*{name}" style="width:100%;padding:6px;"></label>
+    <label>이메일 <input type="email" th:field="*{email}" style="width:100%;padding:6px;"></label>
+    <label>전화번호
+        <input type="text" th:field="*{phone1}" style="width:28%;padding:6px;"> -
+        <input type="text" th:field="*{phone2}" style="width:28%;padding:6px;"> -
+        <input type="text" th:field="*{phone3}" style="width:28%;padding:6px;">
+    </label>
+    <label>새 비밀번호 <input type="password" th:field="*{password}" placeholder="변경 시에만 입력" style="width:100%;padding:6px;"></label>
+    <label>새 비밀번호 재입력 <input type="password" th:field="*{passwordConfirm}" placeholder="변경 시에만 입력" style="width:100%;padding:6px;"></label>
+    <label>우편번호 <input type="text" id="zipcode" th:field="*{zipcode}" readonly style="width:70%;padding:6px;"> <button type="button" onclick="execDaumPostcode()">우편번호 찾기</button></label>
+    <label>주소 <input type="text" id="address" th:field="*{address}" readonly style="width:100%;padding:6px;"></label>
+    <label>상세주소 <input type="text" id="detailAddress" th:field="*{detailAddress}" style="width:100%;padding:6px;"></label>
+    <button type="submit" style="margin-top:12px;">수정</button>
+</form>
+</div>
+<script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+<script>
+    function execDaumPostcode() {
+        new daum.Postcode({
+            oncomplete: function(data) {
+                document.getElementById('zipcode').value = data.zonecode;
+                document.getElementById('address').value = data.roadAddress;
+                document.getElementById('detailAddress').focus();
+            }
+        }).open();
+    }
+</script>
+</body>
+</html>

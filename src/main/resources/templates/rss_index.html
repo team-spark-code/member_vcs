@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSONL File Viewer - Column Based with Database Save</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+<div class="container">
+    <h1>JSONL File Viewer - Column Based with Database Save</h1>
+
+    <!-- 에러 메시지 표시 -->
+    <div th:if="${error}" class="error">
+        <strong>오류:</strong> <span th:text="${error}"></span>
+    </div>
+
+    <!-- 파일 목록 섹션 -->
+    <div class="section">
+        <h3>파일 목록 (d:\data)</h3>
+        <div th:if="${fileNames != null and !fileNames.empty}">
+            <ul id="fileList">
+                <li th:each="file : ${fileNames}">
+                    <a th:href="@{/rss(fileName=${file})}" th:text="${file}"
+                       th:class="${file == selectedFile} ? 'selected' : ''"></a>
+                </li>
+            </ul>
+        </div>
+        <div th:if="${fileNames == null or fileNames.empty}">
+            <p>d:\data 폴더에 .jsonl 파일이 없습니다.</p>
+        </div>
+    </div>
+
+    <!-- 선택된 파일의 데이터 테이블 -->
+    <div th:if="${selectedFile != null and columns != null and data != null}" class="section">
+        <h3>데이터 테이블</h3>
+        <div class="stats">
+            <div class="stat-item">
+                <strong th:text="${selectedFile}">파일명</strong>
+                <span>선택된 파일</span>
+            </div>
+            <div class="stat-item">
+                <strong th:text="${totalRecords}">0</strong>
+                <span>총 레코드 수</span>
+            </div>
+            <div class="stat-item">
+                <strong th:text="${#lists.size(columns)}">0</strong>
+                <span>총 컬럼 수</span>
+            </div>
+        </div>
+
+        <!-- 검색 및 필터 -->
+        <div class="column-filter">
+            <input type="text" id="searchInput" placeholder="검색어 입력..." onkeyup="filterTable()">
+            <select id="columnSelect" onchange="filterByColumn()">
+                <option value="">모든 컬럼</option>
+                <option th:each="col : ${columns}" th:value="${col}" th:text="${col}"></option>
+            </select>
+            <button class="btn btn-secondary" onclick="exportTableToCSV()">CSV 내보내기</button>
+        </div>
+
+        <!-- 데이터 테이블 -->
+        <div class="table-container">
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th th:each="col : ${columns}" th:text="${col}"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="record : ${data}" th:data-row-index="${recordStat.index}">
+                        <td th:each="col : ${columns}">
+                            <span th:if="${record.get(col) != null}" th:text="${record.get(col)}"></span>
+                            <span th:if="${record.get(col) == null}" class="null-value">NULL</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="table-info">
+            <span class="record-count">
+                총 <span th:text="${totalRecords}">0</span>개 레코드 중
+                <span th:text="${(currentPage-1) * pageSize + 1}">1</span>-<span th:text="${(currentPage-1) * pageSize + #lists.size(data)}">10</span>개 표시
+                (페이지 <span th:text="${currentPage}">1</span>/<span th:text="${totalPages}">1</span>)
+            </span>
+            <span class="column-count"><span th:text="${#lists.size(columns)}">0</span>개 컬럼</span>
+        </div>
+
+        <!-- 페이징 네비게이션 -->
+        <div th:if="${totalPages > 1}" class="pagination-container">
+            <nav class="pagination">
+                <!-- 이전 페이지 -->
+                <a th:if="${hasPrev}"
+                   th:href="@{/rss(fileName=${selectedFile}, page=${prevPage}, size=${pageSize})}"
+                   class="pagination-btn">
+                    &laquo; 이전
+                </a>
+                <span th:unless="${hasPrev}" class="pagination-btn disabled">
+                    &laquo; 이전
+                </span>
+
+                <!-- 페이지 번호들 -->
+                <div class="page-numbers">
+                    <!-- 첫 번째 페이지 -->
+                    <a th:if="${currentPage > 3}"
+                       th:href="@{/rss(fileName=${selectedFile}, page=1, size=${pageSize})}"
+                       class="pagination-btn">1</a>
+
+                    <!-- 점점점 표시 -->
+                    <span th:if="${currentPage > 4}" class="pagination-dots">...</span>
+
+                    <!-- 현재 페이지 주변 페이지들 -->
+                    <th:block th:each="pageNum : ${#numbers.sequence(T(java.lang.Math).max(1, currentPage - 2), T(java.lang.Math).min(totalPages, currentPage + 2))}">
+                        <a th:if="${pageNum != currentPage}"
+                           th:href="@{/rss(fileName=${selectedFile}, page=${pageNum}, size=${pageSize})}"
+                           th:text="${pageNum}"
+                           class="pagination-btn"></a>
+                        <span th:if="${pageNum == currentPage}"
+                              th:text="${pageNum}"
+                              class="pagination-btn current"></span>
+                    </th:block>
+
+                    <!-- 점점점 표시 -->
+                    <span th:if="${currentPage < totalPages - 3}" class="pagination-dots">...</span>
+
+                    <!-- 마지막 페이지 -->
+                    <a th:if="${currentPage < totalPages - 2}"
+                       th:href="@{/rss(fileName=${selectedFile}, page=${totalPages}, size=${pageSize})}"
+                       th:text="${totalPages}"
+                       class="pagination-btn"></a>
+                </div>
+
+                <!-- 다음 페이지 -->
+                <a th:if="${hasNext}"
+                   th:href="@{/rss(fileName=${selectedFile}, page=${nextPage}, size=${pageSize})}"
+                   class="pagination-btn">
+                    다음 &raquo;
+                </a>
+                <span th:unless="${hasNext}" class="pagination-btn disabled">
+                    다음 &raquo;
+                </span>
+            </nav>
+        </div>
+
+        <!-- 데이터베이스 저장 섹션 -->
+        <div class="database-save-section">
+            <h4>데이터베이스 저장</h4>
+            <div class="save-controls">
+                <div class="save-info">
+                    <p><strong>선택된 파일:</strong> <span th:text="${selectedFile}">파일명</span></p>
+                    <p><strong>저장될 레코드 수:</strong> <span th:text="${totalRecords}">0</span>개</p>
+                </div>
+                <div class="save-buttons">
+                    <button class="btn btn-success btn-save"
+                            th:data-filename="${selectedFile}"
+                            onclick="saveToDatabase(this.getAttribute('data-filename'))">
+                        <span class="btn-icon">💾</span>
+                        데이터베이스에 저장
+                    </button>
+                    <button class="btn btn-secondary" onclick="showSaveConfirm()">
+                        <span class="btn-icon">⚙️</span>
+                        저장 옵션
+                    </button>
+                </div>
+            </div>
+            <div id="saveResult" style="display:none; margin-top: 15px;"></div>
+
+            <!-- 저장 확인 다이얼로그 -->
+            <div id="saveConfirmDialog" class="modal" style="display:none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5>데이터베이스 저장 확인</h5>
+                        <button class="modal-close" onclick="hideSaveConfirm()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <p>선택한 파일의 모든 데이터를 데이터베이스에 저장하시겠습니까?</p>
+                        <div class="save-options">
+                            <label>
+                                <input type="checkbox" id="overwriteData" checked>
+                                기존 데이터 덮어쓰기 허용
+                            </label>
+                            <label>
+                                <input type="checkbox" id="createBackup">
+                                저장 전 백업 생성
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="hideSaveConfirm()">취소</button>
+                        <button class="btn btn-success"
+                                th:data-filename="${selectedFile}"
+                                onclick="confirmSaveToDatabase(this.getAttribute('data-filename'))">저장 확인</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API 엔드포인트 섹션 -->
+    <div class="section">
+        <h3>API 엔드포인트</h3>
+        <ul>
+            <li><strong>GET /api/files/data</strong> - JSONL 파일 목록</li>
+            <li><strong>GET /api/files/data/{fileName}/columns</strong> - 컬럼 정보</li>
+            <li><strong>GET /api/files/data/{fileName}/structured</strong> - 구조화된 데이터</li>
+            <li><strong>POST /api/files/data/{fileName}/save-to-db</strong> - 데이터베이스 저장</li>
+        </ul>
+    </div>
+</div>
+
+<script>
+// 테이블 필터링 함수
+function filterTable() {
+    const searchInput = document.getElementById('searchInput');
+    const table = document.getElementById('dataTable');
+
+    if (!searchInput || !table) return;
+
+    const filter = searchInput.value.toLowerCase();
+    const rows = table.getElementsByTagName('tr');
+
+    for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        let shouldShow = false;
+
+        const cells = row.getElementsByTagName('td');
+        for (let j = 0; j < cells.length; j++) {
+            const cellText = cells[j].textContent || cells[j].innerText;
+            if (cellText.toLowerCase().indexOf(filter) > -1) {
+                shouldShow = true;
+                break;
+            }
+        }
+
+        row.style.display = shouldShow ? '' : 'none';
+    }
+}
+
+// 컬럼별 필터링
+function filterByColumn() {
+    const columnSelect = document.getElementById('columnSelect');
+    const table = document.getElementById('dataTable');
+
+    if (!columnSelect || !table) return;
+
+    const selectedColumn = columnSelect.value;
+    const headerCells = table.querySelectorAll('thead th');
+    const bodyRows = table.querySelectorAll('tbody tr');
+
+    if (!selectedColumn) {
+        // 모든 컬럼 표시
+        headerCells.forEach(cell => cell.style.display = '');
+        bodyRows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            cells.forEach(cell => cell.style.display = '');
+        });
+        return;
+    }
+
+    // 선택된 컬럼만 표시
+    let selectedIndex = -1;
+    headerCells.forEach((cell, index) => {
+        if (cell.textContent === selectedColumn) {
+            selectedIndex = index;
+            cell.style.display = '';
+        } else {
+            cell.style.display = 'none';
+        }
+    });
+
+    bodyRows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        cells.forEach((cell, index) => {
+            if (index === selectedIndex) {
+                cell.style.display = '';
+            } else {
+                cell.style.display = 'none';
+            }
+        });
+    });
+}
+
+// CSV 내보내기 - 개선된 버전
+function exportTableToCSV() {
+    console.log('CSV 내보내기 시작'); // 디버깅용
+
+    const table = document.getElementById('dataTable');
+    if (!table) {
+        console.error('테이블을 찾을 수 없습니다');
+        alert('테이블을 찾을 수 없습니다.');
+        return;
+    }
+
+    const rows = table.querySelectorAll('tr');
+    if (rows.length === 0) {
+        console.error('테이블에 데이터가 없습니다');
+        alert('내보낼 데이터가 없습니다.');
+        return;
+    }
+
+    let csvContent = '';
+
+    try {
+        rows.forEach((row, index) => {
+            const cells = row.querySelectorAll('th, td');
+            const rowData = Array.from(cells).map(cell => {
+                let text = cell.textContent.trim();
+                // NULL 값 처리
+                if (text === 'NULL') {
+                    text = '';
+                }
+                // CSV 특수문자 처리
+                if (text.includes(',') || text.includes('"') || text.includes('\n')) {
+                    text = `"${text.replace(/"/g, '""')}"`;
+                }
+                return text;
+            });
+            csvContent += rowData.join(',') + '\n';
+            console.log(`행 ${index + 1} 처리 완료`);
+        });
+
+        // 파일명 생성
+        const selectedFile = document.querySelector('[data-filename]')?.getAttribute('data-filename') || 'data';
+        const fileName = selectedFile.replace('.jsonl', '') + '_export.csv';
+
+        // Blob 생성 및 다운로드
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', fileName);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+
+        console.log('CSV 파일 다운로드 시작:', fileName);
+        link.click();
+
+        // 정리
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        console.log('CSV 내보내기 완료');
+
+        // 성공 메시지 표시
+        const message = document.createElement('div');
+        message.className = 'success';
+        message.innerHTML = `<strong>성공!</strong> CSV 파일이 다운로드되었습니다: ${fileName}`;
+        message.style.position = 'fixed';
+        message.style.top = '20px';
+        message.style.right = '20px';
+        message.style.zIndex = '1000';
+        message.style.padding = '10px';
+        message.style.borderRadius = '5px';
+        document.body.appendChild(message);
+
+        setTimeout(() => {
+            document.body.removeChild(message);
+        }, 3000);
+
+    } catch (error) {
+        console.error('CSV 내보내기 중 오류:', error);
+        alert('CSV 내보내기 중 오류가 발생했습니다: ' + error.message);
+    }
+}
+
+// 데이터베이스 저장
+function saveToDatabase(fileName) {
+    const saveResult = document.getElementById('saveResult');
+    const saveButton = document.querySelector('.btn-save');
+
+    // 버튼 비활성화 및 로딩 표시
+    saveButton.disabled = true;
+    saveButton.innerHTML = '<span class="btn-icon">⏳</span>저장 중...';
+
+    saveResult.innerHTML = '<p>저장 중...</p>';
+    saveResult.style.display = 'block';
+
+    console.log('Saving file:', fileName); // 디버깅용
+
+    fetch(`/api/files/data/${encodeURIComponent(fileName)}/save-to-db`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => {
+        console.log('Response status:', response.status); // 디버깅용
+        console.log('Response headers:', response.headers); // 디버깅용
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Response data:', data); // 디버깅용
+
+        if (data.success) {
+            saveResult.innerHTML = `
+                <div class="success">
+                    <strong>성공!</strong> ${data.message}<br>
+                    저장된 레코드 수: ${data.savedRecords}
+                </div>
+            `;
+        } else {
+            saveResult.innerHTML = `
+                <div class="error">
+                    <strong>오류:</strong> ${data.message || '알 수 없는 오류가 발생했습니다.'}
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        saveResult.innerHTML = `
+            <div class="error">
+                <strong>오류:</strong> 저장 중 네트워크 오류가 발생했습니다.<br>
+                상세 오류: ${error.message}
+            </div>
+        `;
+    })
+    .finally(() => {
+        // 버튼 다시 활성화
+        saveButton.disabled = false;
+        saveButton.innerHTML = '<span class="btn-icon">💾</span>데이터베이스에 저장';
+    });
+}
+
+// 저장 확인 다이얼로그 표시
+function showSaveConfirm() {
+    const dialog = document.getElementById('saveConfirmDialog');
+    if (dialog) {
+        dialog.style.display = 'block';
+    }
+}
+
+// 저장 확인 다이얼로그 숨기기
+function hideSaveConfirm() {
+    const dialog = document.getElementById('saveConfirmDialog');
+    if (dialog) {
+        dialog.style.display = 'none';
+    }
+}
+
+// 데이터베이스 저장 확인
+function confirmSaveToDatabase(fileName) {
+    const overwriteData = document.getElementById('overwriteData').checked;
+    const createBackup = document.getElementById('createBackup').checked;
+
+    const saveResult = document.getElementById('saveResult');
+    const confirmButton = document.querySelector('.modal-footer .btn-success');
+
+    // 버튼 비활성화
+    confirmButton.disabled = true;
+    confirmButton.innerHTML = '저장 중...';
+
+    saveResult.innerHTML = '<p>저장 중...</p>';
+    saveResult.style.display = 'block';
+
+    console.log('Confirming save with options:', { overwrite: overwriteData, backup: createBackup });
+
+    fetch(`/api/files/data/${encodeURIComponent(fileName)}/save-to-db`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            overwrite: overwriteData,
+            backup: createBackup
+        })
+    })
+    .then(response => {
+        console.log('Confirm response status:', response.status);
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Confirm response data:', data);
+
+        hideSaveConfirm(); // 다이얼로그 숨기기
+
+        if (data.success) {
+            saveResult.innerHTML = `
+                <div class="success">
+                    <strong>성공!</strong> ${data.message}<br>
+                    저장된 레코드 수: ${data.savedRecords}
+                </div>
+            `;
+        } else {
+            saveResult.innerHTML = `
+                <div class="error">
+                    <strong>오류:</strong> ${data.message || '알 수 없는 오류가 발생했습니다.'}
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Confirm Error:', error);
+        hideSaveConfirm();
+        saveResult.innerHTML = `
+            <div class="error">
+                <strong>오류:</strong> 저장 중 네트워크 오류가 발생했습니다.<br>
+                상세 오류: ${error.message}
+            </div>
+        `;
+    })
+    .finally(() => {
+        // 버튼 다시 활성화
+        confirmButton.disabled = false;
+        confirmButton.innerHTML = '저장 확인';
+    });
+}
+</script>
+</body>
+</html>

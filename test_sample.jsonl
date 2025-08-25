@@ -1,0 +1,6 @@
+{"guid": "test001", "source": "테스트뉴스", "title": "첫 번째 테스트 기사", "author": "홍길동", "description": "이것은 테스트용 기사입니다", "category": "기술", "pubDate": "2025-08-25T10:00:00"}
+{"guid": "test002", "source": "테스트뉴스", "title": "두 번째 테스트 기사", "author": "김철수", "description": "또 다른 테스트 기사입니다", "category": "사회", "pubDate": "2025-08-25T11:00:00"}
+{"guid": "test003", "source": "샘플뉴스", "title": "세 번째 테스트 기사", "author": "이영희", "description": null, "category": "경제", "pubDate": "2025-08-25T12:00:00"}
+{"guid": "test004", "source": "샘플뉴스", "title": "네 번째 테스트 기사", "author": "박민수", "description": "NULL 값 테스트를 위한 기사", "category": null, "pubDate": "2025-08-25T13:00:00"}
+{"guid": "test005", "source": "데모뉴스", "title": "다섯 번째 테스트 기사", "author": "정수진", "description": "마지막 테스트 기사입니다", "category": "문화", "pubDate": "2025-08-25T14:00:00"}
+
