@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import Credentials from "next-auth/providers/credentials";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { member } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { authConfig } from "./auth.config"; // 분리된 설정 파일 import
@@ -19,27 +19,43 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials.password) {
+          console.log("Missing credentials");
           return null;
         }
 
-        const user = await db.query.users.findFirst({
-          where: eq(users.email, credentials.email as string),
-        });
+        try {
+          const user = await db
+            .select()
+            .from(member)
+            .where(eq(member.email, credentials.email as string))
+            .limit(1);
 
-        if (!user || !user.password) {
+          if (!user || user.length === 0 || !user[0].password) {
+            console.log("User not found or no password");
+            return null;
+          }
+
+          const isPasswordValid = await bcrypt.compare(
+            credentials.password as string,
+            user[0].password
+          );
+
+          if (!isPasswordValid) {
+            console.log("Invalid password");
+            return null;
+          }
+
+          console.log("Login successful for user:", user[0].email);
+          return {
+            id: user[0].id,
+            name: user[0].name,
+            email: user[0].email,
+            image: user[0].image,
+          };
+        } catch (error) {
+          console.error("Database error during login:", error);
           return null;
         }
-
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password as string,
-          user.password
-        );
-
-        if (!isPasswordValid) {
-          return null;
-        }
-
-        return { id: user.id, name: user.name, email: user.email, image: user.image };
       },
     }),
   ],

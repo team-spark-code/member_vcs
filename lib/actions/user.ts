@@ -3,7 +3,7 @@
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { member } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from 'uuid';
 import { signIn, signOut } from "@/auth";
@@ -11,9 +11,9 @@ import { AuthError } from "next-auth";
 
 // Zod를 사용한 입력 데이터 유효성 검사 스키마
 const signupSchema = z.object({
-  name: z.string().min(2, { message: "이름은 2자 이상이어야 합니다." }),
-  email: z.string().email({ message: "유효한 이메일을 입력해주세요." }),
-  password: z.string().min(6, { message: "비밀번호는 6자 이상이어야 합니다." }),
+  name: z.string().min(2, { message: "Name must be at least 2 characters long." }),
+  email: z.string().email({ message: "Please enter a valid email address." }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters long." }),
 });
 
 export async function signup(formData: FormData) {
@@ -34,39 +34,44 @@ export async function signup(formData: FormData) {
 
   try {
     // 이메일 중복 확인
-    const existingUser = await db.query.users.findFirst({
-      where: eq(users.email, email),
-    });
+    const existingUser = await db.select().from(member).where(eq(member.email, email)).limit(1);
 
-    if (existingUser) {
-      return { error: { form: "이미 사용중인 이메일입니다." } };
+    if (existingUser.length > 0) {
+      return { error: { form: "This email is already in use." } };
     }
 
     // 비밀번호 해싱
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // 새로운 사용자 데이터베이스에 저장
-    await db.insert(users).values({
-      id: uuidv4(),
+    const userId = uuidv4();
+    const now = new Date();
+
+    await db.insert(member).values({
+      id: userId,
       name,
       email,
       password: hashedPassword,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: name,
+      updatedBy: name,
     });
 
-    return { success: "회원가입이 완료되었습니다. 이제 로그인할 수 있습니다." };
+    return { success: "Registration completed successfully. You can now sign in." };
   } catch (error) {
-    console.error(error);
-    return { error: { form: "알 수 없는 오류가 발생했습니다. 다시 시도해주세요." } };
+    console.error("Signup error:", error);
+    return { error: { form: "An unknown error occurred. Please try again." } };
   }
 }
 
-export async function login(formData: FormData) {
+export async function login(_prevState: any, formData: FormData) {
   try {
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
 
     if (!email || !password) {
-      return { error: "이메일과 비밀번호를 모두 입력해주세요." };
+      return { error: "Please enter both email and password." };
     }
 
     // next-auth의 signIn 함수를 호출하여 로그인 시도
@@ -77,14 +82,15 @@ export async function login(formData: FormData) {
       redirectTo: "/",
     });
 
+    return { success: true };
   } catch (error) {
     // AuthError는 next-auth에서 발생하는 인증 관련 오류
     if (error instanceof AuthError) {
       switch (error.type) {
         case "CredentialsSignin":
-          return { error: "이메일 또는 비밀번호가 올바르지 않습니다." };
+          return { error: "Invalid email or password." };
         default:
-          return { error: "로그인 중 알 수 없는 오류가 발생했습니다." };
+          return { error: "An unknown error occurred during sign in." };
       }
     }
     // 다른 종류의 오류는 다시 throw하여 Next.js가 처리하도록 함
